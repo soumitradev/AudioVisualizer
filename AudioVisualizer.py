@@ -7,7 +7,7 @@ import pygame
 import sys
 
 # Define some constants that will be used throughout the script
-SONG_FILE = './tst.wav'
+SONG_FILE = './pls.wav'
 NUMBER_OF_PACKETS_PER_SEC = 15
 NUMBER_OF_BINS = 50
 BLOCK_SIZE = 20
@@ -25,6 +25,8 @@ size = width, height = PADDING + NUMBER_OF_BINS*(BLOCK_SIZE + PADDING), 680
 # Note how we also pass the number of samples as an argument
 # since we call this function a lot and repeatedly calculating number of samples
 # (which is a constant) will only slow it down
+
+
 def FFT(stuff, sampling_rate, num_samples):
     # Perform an FFT on our audio data and grab the first half
     # since the second half is a mirror of the first in a fourier transform
@@ -39,14 +41,17 @@ def FFT(stuff, sampling_rate, num_samples):
 
     # Notice how we used a list comprehension (which is faster than a for loop) and enumerate()
     # instead of accessing F[i] repeatedly. We are trading memory space for speed.
-    # However, note that this won't take a whole lot of memory since we work with only around 
+    # However, note that this won't take a whole lot of memory since we work with only around
     # 2000 sized lists with pure numbers in it, and that all this memory space is deallocated
     # after the function returns.
 
 # Write a function to get the size of the overlap between two ranges. We will use this for rebinning
+
+
 def get_overlap(t1, t2):
     x = min(t1[1], t2[1]) - max(t1[0], t2[0])
     return x if x > 0 else 0
+
 
 # Read in the song file
 sample_rate, data = wavfile.read(SONG_FILE)
@@ -69,8 +74,10 @@ print("Processing audio...")
 e = time.time()
 
 # Break audio samples into packets, and perform FFT on each packet
-packeted_data = [data[i*packet_len:(i+1)*packet_len] for i in range(N//packet_len + 1)]
-fft_ed_data = [FFT(packet, sample_rate, packet_len) for packet in packeted_data]
+packeted_data = [data[i*packet_len:(i+1)*packet_len]
+                 for i in range(N//packet_len + 1)]
+fft_ed_data = [FFT(packet, sample_rate, packet_len)
+               for packet in packeted_data]
 print("FFT completed.")
 d = time.time()
 
@@ -82,7 +89,8 @@ for packet in fft_ed_data:
     amps, old_bins = zip(*packet)
     old_bins = list(old_bins)
     old_bins.append(sample_rate/2)
-    bin_limits = [sample_rate/2 * (B_i/NUMBER_OF_BINS)**2 for B_i in range(NUMBER_OF_BINS + 1)]
+    bin_limits = [sample_rate/2 *
+                  (B_i/NUMBER_OF_BINS)**2 for B_i in range(NUMBER_OF_BINS + 1)]
 
     new_bin_vals = []
 
@@ -102,9 +110,10 @@ for packet in fft_ed_data:
                 break
         # Initialize a sum and add the corresponding portion of the audio intensity to our new bin.
         s = 0
-        for k in range(low, hi+1):
-            s += packet[min(k, 1469)][0] * (get_overlap((bin_limits[i-1], bin_limits[i]), (old_bins[max(0, k-1)], old_bins[min(k, 1469)])) / (old_bins[k] - old_bins[max(0, k-1)]))
-        
+        for k in range(low, hi):
+            s += packet[min(k, 1469)][0] * (get_overlap((bin_limits[i-1], bin_limits[i]),
+                                                        (old_bins[max(0, k-1)], old_bins[min(k, 1469)])) / (old_bins[k] - old_bins[max(0, k-1)]))
+
         # Append the rebinned bin value to our new bin value list
         new_bin_vals.append(s)
     # Append packet to the rebinned binned list
@@ -117,9 +126,12 @@ c = time.time()
 interpolated = []
 glob_max = max([max(packet) for packet in rebinned])
 for i in range(len(rebinned) - 1):
-    interpolated.append([math.log((m/glob_max)**2 + 1)/math.log(2) for m in rebinned[i]])
-    interpolated_packet = [(rebinned[i][j] + rebinned[i+1][j])/2 for j in range(NUMBER_OF_BINS)]
-    interpolated.append([math.log((m/glob_max)**2 + 1)/math.log(2) for m in interpolated_packet])
+    interpolated.append([math.log((m/glob_max)**2 + 1) /
+                         math.log(2) for m in rebinned[i]])
+    interpolated_packet = [
+        (rebinned[i][j] + rebinned[i+1][j])/2 for j in range(NUMBER_OF_BINS)]
+    interpolated.append([math.log((m/glob_max)**2 + 1)/math.log(2)
+                         for m in interpolated_packet])
 
 
 print("Interpolation completed.")
@@ -136,15 +148,15 @@ pygame.init()
 
 # Initialize audio
 mixer = pygame.mixer
-mixer.init() 
-  
+mixer.init()
+
 # Loading the song for pygame to play
-mixer.music.load(SONG_FILE) 
-  
-# Setting the volume 
-mixer.music.set_volume(0.7) 
-  
-# Start playing the song 
+mixer.music.load(SONG_FILE)
+
+# Setting the volume
+mixer.music.set_volume(0.7)
+
+# Start playing the song
 # Create screen for showing viusalisation
 screen = pygame.display.set_mode(size)
 pygame.display.set_caption("Audio Visualiser")
@@ -162,15 +174,16 @@ while cur_packet_index < len(interpolated):
     # Handle exit event
     for event in events:
         # Let user exit
-        if event.type == pygame.QUIT: sys.exit()            
+        if event.type == pygame.QUIT:
+            sys.exit()
 
     # Fill the screen with BG_COLOR
     screen.fill(BG_COLOR)
 
     # Show every bar
     for ind, intensity in enumerate(interpolated[cur_packet_index]):
-        pygame.draw.rect(screen, CELL_COLOR, pygame.Rect(PADDING + ind*(PADDING + BLOCK_SIZE), 690, BLOCK_SIZE, -int(intensity * 660)))
-
+        pygame.draw.rect(screen, CELL_COLOR, pygame.Rect(
+            PADDING + ind*(PADDING + BLOCK_SIZE), 690, BLOCK_SIZE, -int(intensity * 660)))
 
     # Update the display
     pygame.display.update()
@@ -178,4 +191,3 @@ while cur_packet_index < len(interpolated):
     # Tick the display as per FPS, and move to next packet
     pygame.time.Clock().tick(FPS)
     cur_packet_index += 1
-    
